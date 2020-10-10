@@ -1,0 +1,6 @@
+Note: Uploading these keys to GitHub is definitely not secure, and we should probably get rid of this file later.
+
+API key: Xuu8AlgNIdcnD3XeWUc325mId
+API key secret: zlzjJp4B783U1KzYaAJBWykYfk6haihCr1i8czNTAdEKlgy42W
+Access token: 1304199818517123072-tCRZLdNkX7GFtafjyUdZJHSr47t6uT
+Access token secret: YFbTORPAaw3XTy2L9BYIJpaKa7xwhXm53s7kmT0mtYrlL
