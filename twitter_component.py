@@ -79,7 +79,7 @@ class TwitterComponent:
         3.) Call the style transfer component in another process.
             > Use something like: p = multiprocessing.Process(target=StyleTransfer.transfer, name="style_transfer", args=args)
             > Then start it with p.start()
-        4.) Use p.join(timeout=20*60) to wait for the style transfer process.
+        4.) Use p.join(timeout=TIMEOUT) to wait for the style transfer process.
         5.) Check if the style transfer thread is alive (use p.is_alive()).
         6.) If it's still alive after twenty minutes, kill it with p.terminate()
         7.) Go back to step one and repeat.
