@@ -4,6 +4,7 @@ import time
 import tweepy
 import requests
 import datetime
+import queue
 
 class TwitterComponent:
     api = None # Used to access the Twitter API
@@ -47,19 +48,37 @@ class TwitterComponent:
                 """
 
                 TODO: Add all of those mentions to the queue here.
-                
+
                 The "mentions" list contains a list of Status objects that
                 need to be added to the queue. Keep in mind that if there
                 are already objects in the queue, then we need to:
 
                 1.) Make sure that the queue length does not exceed 20
                     Status objects.
+
                 2.) Make sure that we keep track of which Status objects
                     are not being added onto the queue. We will need to
                     send a reply to those people stating that they could
                     not be added onto the queue.
 
                 """
+
+
+                #loops through the mentions list and add them to the queue
+                #creates a list of items not added to the queue
+                q = queue.Queue()
+                for i in range(len(mentions)):
+                    if(q.qsize > 20){
+                        print("Sorry your request cannot be completed at this time")
+                        not_added = mentions[i:len(mentions)]
+                        break
+                    }
+                    else{
+                        q.put(mentions[i])
+                    }
+
+
+
 
             # Wait for one minute
             print("Enqueue Thread: Waiting.")
@@ -71,7 +90,7 @@ class TwitterComponent:
         assert threading.current_thread().name == "dequeue_thread"
 
         """
-        
+
         TODO: This function can only be written after the queue has been finished.
         It should do the following:
         1.) If the queue is empty, block the thread until it is not empty.
