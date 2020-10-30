@@ -55,10 +55,14 @@ class TwitterComponent:
                     if(self.twitter_queue.qsize() > 20):
                         # Send a Tweet to the user that they weren't added to the queue
                         print("Enqueue Thread: Rejected " + user_to_reply_to + "\'s request.")
+                        self.api_lock.acquire()
                         self.api.update.status("@" + user_to_reply_to + " Sorry, I currently have too many requests in my queue. Your request cannot be completed.")
+                        self.api_lock.release()
                     else:
                         print("Enqueue Thread: Accepted " + user_to_reply_to + "\'s request.")
+                        self.api_lock.acquire()
                         self.api.update_status("@" + user_to_reply_to + " you have been added to the queue.", in_reply_to_status_id=mention.id)
+                        self.api_lock.release()
                         self.twitter_queue.put(mention)
 
             # Wait for 20 seconds
