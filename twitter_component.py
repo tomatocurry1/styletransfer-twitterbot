@@ -5,6 +5,8 @@ import tweepy
 import requests
 import datetime
 import queue
+import os
+from style_component import StyleComponent
 
 class TwitterComponent:
     api = None # Used to access the Twitter API
@@ -61,7 +63,7 @@ class TwitterComponent:
                     else:
                         print("Enqueue Thread: Accepted " + user_to_reply_to + "\'s request.")
                         self.api_lock.acquire()
-                        self.api.update_status("@" + user_to_reply_to + " you have been added to the queue.", in_reply_to_status_id=mention.id)
+                        self.api.update_status("@" + user_to_reply_to + " You have been added to the queue.", in_reply_to_status_id=mention.id)
                         self.api_lock.release()
                         self.twitter_queue.put(mention)
 
@@ -73,26 +75,51 @@ class TwitterComponent:
     # If there are no mentions, then this will wait until there is a mention
     def __prune_queue(self, none):
         assert threading.current_thread().name == "dequeue_thread"
-        time.sleep(3)
-        for mention in iter(self.twitter_queue.get, None):
-            print(mention.text)
+        style_component = StyleComponent()
 
-        """
+        while True:
+            # Get the mention from the queue
+            print("Dequeue Thread: Waiting for mention in queue.")
+            mention = self.twitter_queue.get(block=True)
+            user_to_reply_to = mention.user.screen_name
+            print("Dequeue Thread: Processing request from " + user_to_reply_to)
+            try:
+                # Download the image
+                link = mention.entities["media"][0]["media_url_https"]
+                with requests.get(link, stream=True) as response:
+                    with open("temp.jpg", "wb") as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                print("Dequeue Thread: Successfully downloaded " + user_to_reply_to + "\'s image and starting style transfer.")
 
-        TODO: This function can only be written after the queue has been finished.
-        It should do the following:
-        1.) If the queue is empty, block the thread until it is not empty.
-        2.) Dequeue an item on the queue.
-        3.) Call the style transfer component in another process.
-            > Use something like: p = multiprocessing.Process(target=StyleTransfer.transfer, name="style_transfer", args=args)
-            > Then start it with p.start()
-        4.) Use p.join(timeout=TIMEOUT) to wait for the style transfer process.
-        5.) Check if the style transfer thread is alive (use p.is_alive()).
-        6.) If it's still alive after twenty minutes, kill it with p.terminate()
-        7.) Go back to step one and repeat.
+                # Create a new process for the style transfer
+                images=("temp.jpg", "starry-night.jpg")
+                style_transfer_process = multiprocessing.Process(target=style_component.transfer,
+                        name="style_transfer", args=images)
+                style_transfer_process.start()
+                style_transfer_process.join(timeout=self.TIMEOUT)
 
-        """
-        pass
+                # Delete the image
+                os.remove("temp.jpg")
+
+                # Kill the process if it's alive after the timeout
+                if(style_transfer_process.is_alive()):
+                    print("Dequeue Thread: Style transfer took more than 20 minutes!")
+                    style_transfer_process.terminate()
+                    self.api_lock.acquire()
+                    self.api.update_status("@" + user_to_reply_to + " I could not process your style transfer because it was taking too long :(", in_reply_to_status_id=mention.id)
+                    self.api_lock.release()
+                else:
+                    # Tweet the output
+                    print("Dequeue Thread: Finished style transfer for " + user_to_reply_to)
+                    self.api_lock.acquire()
+                    self.api.update_with_media("output.jpg",
+                            "@" + user_to_reply_to + " Here is your finished image!",
+                            in_reply_to_status_id=mention.id)
+                    self.api_lock.release()
+            except KeyError:
+                # If there was no image in the mention, then a KeyError will be thrown
+                pass
 
     # Starts two threads: one for enqueuing Tweets and another for dequeuing
     def start(self):
