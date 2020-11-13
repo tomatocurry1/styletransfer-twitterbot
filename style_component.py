@@ -18,11 +18,11 @@ from style_transfer_basis import get_style_model_and_losses, image_loader, unloa
 
 class StyleComponent:
 
-
+    styleImages = {'starry night': "starry-night.jpg", 'tsunami': "hokusai_tsunami.jpg", 'udnie': "udnie.jpg"}
 
 
     def __init__(self):
-        self.styleImages = ["starry-night.jpg"]
+        
         self.size = (320, 320)
         self.scalefactor = 320*320         
 
@@ -65,9 +65,9 @@ class StyleComponent:
 
 
 if __name__ == '__main__':
-    contentImage = "chicken.png"
+    contentImage = "surfer.jpg"
     styleImage = "starry-night.jpg"
     from time import time
     start = time()
-    StyleComponent().transfer(contentImage, styleImage)
+    StyleComponent().transfer(contentImage, StyleComponent.styleImages['tsunami'])
     print(time()-start)
