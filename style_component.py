@@ -14,7 +14,7 @@ from math import log, ceil, sqrt
 
 import copy
 
-from style_transfer_basis import get_style_model_and_losses, image_loader, unloader, run_style_transfer, device, cnn_normalization_mean, cnn_normalization_std
+from style_transfer_basis import get_style_model_and_losses, image_loader, unloader, run_style_transfer, device, cnn_normalization_mean, cnn_normalization_std, cnn
 
 class StyleComponent:
 
@@ -28,17 +28,15 @@ class StyleComponent:
 
 
 
-
-
     def transfer(self, contentImage, styleImage):
         size = self.calculateSize(Image.open(contentImage))
 
 
-        print(size)
+        
         contentImage = image_loader(contentImage, size)
         styleImage = image_loader(styleImage, size)
         
-        cnn = models.vgg19(pretrained=True).features.to(device).eval()
+        
 
         input_img = contentImage.clone()
         styled_output = run_style_transfer(cnn, cnn_normalization_mean, cnn_normalization_std,
