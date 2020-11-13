@@ -12,6 +12,7 @@ class TwitterComponent:
     api = None # Used to access the Twitter API
     api_lock = None # Lock that must be acquired before using the api
     twitter_queue = None # Queue for Twitter Statuses
+    style_component = None # Access the Style Component
     TIMEOUT = 20*60 # Max timeout in seconds (equal to twenty minutes)
 
     def __init__(self):
@@ -22,6 +23,56 @@ class TwitterComponent:
         self.api_lock.acquire(blocking=True)
         self.api = tweepy.API(auth)
         self.api_lock.release()
+        self.style_component = StyleComponent()
+
+    # Returns a new list of mentions that does not contain invalid requests
+    def __validate(self, mentions, last_time):
+        assert threading.current_thread().name == "enqueue_thread"
+        not_deleted_mentions = []
+
+        # Do input validation for all mentions
+        for mention in mentions:
+            delete = False
+
+            # Get the user's screen name
+            user_to_reply_to = mention.user.screen_name
+
+            # Delete the mentions in the list that come before last_time
+            if(mention.created_at <= last_time):
+                delete = True
+
+            # Delete the mentions that do not contain any image
+            try:
+                # If there is no image, this line of code will throw a KeyError
+                mention.entities["media"][0]
+            except KeyError:
+                # Send a message to the user saying that they need to attach an image
+                self.api_lock.acquire()
+                self.api.update_status("@" + user_to_reply_to + " You must attach an image.",
+                        in_reply_to_status_id=mention.id)
+                self.api_lock.release()
+                delete = True
+
+            # Check the style transfer name
+            add = False
+            for style in self.style_component.styleImages: # Loop through each style
+                if(style in mention.text): # Check if the name of that style appeared in the text
+                    add = True
+                    mention.text = style # This is just done to make it easier to the dequeue thread
+                    break
+            if(not add): # If the user did not have a style, then do this
+                self.api_lock.acquire()
+                self.api.update_status("@" + user_to_reply_to + " Invalid style. Your options are: "
+                        + str(list(self.style_component.styleImages.keys()))[1:-1],
+                        in_reply_to_status_id=mention.id)
+                self.api_lock.release()
+                delete = True
+
+            # Add the mention if it passed all the checks
+            if(not delete):
+                not_deleted_mentions.append(mention)
+
+        return not_deleted_mentions
 
     # Checks for mentions and enqueues them if necessary
     def __check_mentions(self, none):
@@ -37,28 +88,21 @@ class TwitterComponent:
             mentions = self.api.mentions_timeline(count=20)
             self.api_lock.release()
 
-            # Delete the mentions in the list that come before last_time
-            not_deleted_mentions = []
-            for mention in mentions:
-                if(mention.created_at > last_time):
-                    not_deleted_mentions.append(mention)
-            mentions = not_deleted_mentions
-
-            # TODO: Do input validation for mentions.
-            # Delete mentions that do not have a valid image or do not have a name of a style
+            # Validate the mentions
+            mentions = self.__validate(mentions, last_time)
 
             if(len(mentions) > 0):
                 # Set last_time equal to the created_at value for the latest mention
                 last_time = mentions[0].created_at
 
-                print("Enqueue Thread: Adding mentions to the queue.")
+                print("Enqueue Thread: Adding " + str(len(mentions)) + " mentions to the queue.")
                 for mention in mentions:
                     user_to_reply_to = mention.user.screen_name
                     if(self.twitter_queue.qsize() > 20):
                         # Send a Tweet to the user that they weren't added to the queue
                         print("Enqueue Thread: Rejected " + user_to_reply_to + "\'s request.")
                         self.api_lock.acquire()
-                        self.api.update.status("@" + user_to_reply_to + " Sorry, I currently have too many requests in my queue. Your request cannot be completed.")
+                        self.api.update_status("@" + user_to_reply_to + " Sorry, I currently have too many requests in my queue. Your request cannot be completed.", in_reply_to_status_id=mention.id)
                         self.api_lock.release()
                     else:
                         print("Enqueue Thread: Accepted " + user_to_reply_to + "\'s request.")
@@ -75,7 +119,6 @@ class TwitterComponent:
     # If there are no mentions, then this will wait until there is a mention
     def __prune_queue(self, none):
         assert threading.current_thread().name == "dequeue_thread"
-        style_component = StyleComponent()
 
         while True:
             # Get the mention from the queue
@@ -83,6 +126,7 @@ class TwitterComponent:
             mention = self.twitter_queue.get(block=True)
             user_to_reply_to = mention.user.screen_name
             print("Dequeue Thread: Processing request from " + user_to_reply_to)
+
             try:
                 # Download the image
                 link = mention.entities["media"][0]["media_url_https"]
@@ -93,8 +137,8 @@ class TwitterComponent:
                 print("Dequeue Thread: Successfully downloaded " + user_to_reply_to + "\'s image and starting style transfer.")
 
                 # Create a new process for the style transfer
-                images=("temp.jpg", "starry-night.jpg")
-                style_transfer_process = multiprocessing.Process(target=style_component.transfer,
+                images=("temp.jpg", self.style_component.styleImages[mention.text])
+                style_transfer_process = multiprocessing.Process(target=self.style_component.transfer,
                         name="style_transfer", args=images)
                 style_transfer_process.start()
                 style_transfer_process.join(timeout=self.TIMEOUT)
