@@ -38,35 +38,35 @@ class TwitterComponent:
             user_to_reply_to = mention.user.screen_name
 
             # Delete the mentions in the list that come before last_time
-            if(mention.created_at <= last_time):
+            if(mention.created_at.replace(tzinfo=datetime.timezone.utc) <= last_time):
                 delete = True
+            else:
+                # Delete the mentions that do not contain any image
+                try:
+                    # If there is no image, this line of code will throw a KeyError
+                    mention.entities["media"][0]
+                except KeyError:
+                    # Send a message to the user saying that they need to attach an image
+                    self.api_lock.acquire()
+                    self.api.update_status("@" + user_to_reply_to + " You must attach an image.",
+                            in_reply_to_status_id=mention.id)
+                    self.api_lock.release()
+                    delete = True
 
-            # Delete the mentions that do not contain any image
-            try:
-                # If there is no image, this line of code will throw a KeyError
-                mention.entities["media"][0]
-            except KeyError:
-                # Send a message to the user saying that they need to attach an image
-                self.api_lock.acquire()
-                self.api.update_status("@" + user_to_reply_to + " You must attach an image.",
-                        in_reply_to_status_id=mention.id)
-                self.api_lock.release()
-                delete = True
-
-            # Check the style transfer name
-            add = False
-            for style in self.style_component.styleImages: # Loop through each style
-                if(style in mention.text): # Check if the name of that style appeared in the text
-                    add = True
-                    mention.text = style # This is just done to make it easier to the dequeue thread
-                    break
-            if(not add): # If the user did not have a style, then do this
-                self.api_lock.acquire()
-                self.api.update_status("@" + user_to_reply_to + " Invalid style. Your options are: "
-                        + str(list(self.style_component.styleImages.keys()))[1:-1],
-                        in_reply_to_status_id=mention.id)
-                self.api_lock.release()
-                delete = True
+                # Check the style transfer name
+                add = False
+                for style in self.style_component.styleImages: # Loop through each style
+                    if(style in mention.text): # Check if the name of that style appeared in the text
+                        add = True
+                        mention.text = style # This is just done to make it easier to the dequeue thread
+                        break
+                if(not add): # If the user did not have a style, then do this
+                    self.api_lock.acquire()
+                    self.api.update_status("@" + user_to_reply_to + " Invalid style. Your options are: "
+                            + str(list(self.style_component.styleImages.keys()))[1:-1],
+                            in_reply_to_status_id=mention.id)
+                    self.api_lock.release()
+                    delete = True
 
             # Add the mention if it passed all the checks
             if(not delete):
@@ -79,9 +79,13 @@ class TwitterComponent:
         assert threading.current_thread().name == "enqueue_thread"
 
         # This contains the last time that we checked for mentions
-        last_time = datetime.datetime.min
+        last_time = datetime.datetime.now(tz=datetime.timezone.utc)
 
         while True:
+            # Wait for twenty seconds
+            print("Enqueue Thread: Waiting.")
+            time.sleep(20)
+
             # Get the last 20 mentions
             print("Enqueue Thread: Reading last 20 mentions.")
             self.api_lock.acquire(blocking=True)
@@ -93,7 +97,7 @@ class TwitterComponent:
 
             if(len(mentions) > 0):
                 # Set last_time equal to the created_at value for the latest mention
-                last_time = mentions[0].created_at
+                last_time = mentions[0].created_at.replace(tzinfo=datetime.timezone.utc)
 
                 print("Enqueue Thread: Adding " + str(len(mentions)) + " mentions to the queue.")
                 for mention in mentions:
@@ -110,10 +114,6 @@ class TwitterComponent:
                         self.api.update_status("@" + user_to_reply_to + " You have been added to the queue.", in_reply_to_status_id=mention.id)
                         self.api_lock.release()
                         self.twitter_queue.put(mention)
-
-            # Wait for 20 seconds
-            print("Enqueue Thread: Waiting.")
-            time.sleep(20)
 
     # Dequeues a mention and executes the style transfer thread
     # If there are no mentions, then this will wait until there is a mention
