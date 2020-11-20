@@ -7,7 +7,6 @@ import datetime
 import queue
 import os
 from style_component import StyleComponent
-
 class TwitterComponent:
     api = None # Used to access the Twitter API
     api_lock = None # Lock that must be acquired before using the api
@@ -84,12 +83,12 @@ class TwitterComponent:
         while True:
             # Wait for twenty seconds
             print("Enqueue Thread: Waiting.")
-            time.sleep(20)
+            time.sleep(60)
 
             # Get the last 20 mentions
-            print("Enqueue Thread: Reading last 20 mentions.")
+            print("Enqueue Thread: Reading the last 50 mentions.")
             self.api_lock.acquire(blocking=True)
-            mentions = self.api.mentions_timeline(count=20)
+            mentions = self.api.mentions_timeline(count=50)
             self.api_lock.release()
 
             # Validate the mentions
@@ -99,10 +98,9 @@ class TwitterComponent:
                 # Set last_time equal to the created_at value for the latest mention
                 last_time = mentions[0].created_at.replace(tzinfo=datetime.timezone.utc)
 
-                print("Enqueue Thread: Adding " + str(len(mentions)) + " mentions to the queue.")
                 for mention in mentions:
                     user_to_reply_to = mention.user.screen_name
-                    if(self.twitter_queue.qsize() > 20):
+                    if(self.twitter_queue.qsize() >= 20):
                         # Send a Tweet to the user that they weren't added to the queue
                         print("Enqueue Thread: Rejected " + user_to_reply_to + "\'s request.")
                         self.api_lock.acquire()
