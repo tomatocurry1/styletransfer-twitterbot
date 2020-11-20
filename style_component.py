@@ -23,7 +23,6 @@ class StyleComponent:
 
     def __init__(self):
         
-        self.size = (320, 320)
         self.scalefactor = 320*320         
 
 
@@ -40,7 +39,7 @@ class StyleComponent:
 
         input_img = contentImage.clone()
         styled_output = run_style_transfer(cnn, cnn_normalization_mean, cnn_normalization_std,
-                            contentImage, styleImage,input_img)
+                            contentImage, styleImage, input_img)
 
         
 
