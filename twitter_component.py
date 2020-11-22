@@ -99,7 +99,9 @@ class TwitterComponent:
             self.api_lock.release()
 
             # Validate the mentions
+            next_last_time = datetime.datetime.now(tz=datetime.timezone.utc)
             mentions = self.__validate(mentions, last_time)
+            last_time = next_last_time
 
             if(len(mentions) > 0):
                 # Set last_time equal to the created_at value for the latest mention
