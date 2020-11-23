@@ -21,3 +21,4 @@ def checkOutputImage():
 
 if __name__ == '__main__':
 	assert checkOutputImage()
+	print("style_test completed successfully")
